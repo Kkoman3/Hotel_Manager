@@ -8,7 +8,8 @@ import {
   Wrench, 
   Clock, 
   User as UserIcon,
-  CheckCircle2
+  CheckCircle2,
+  Users
 } from 'lucide-react';
 import { Room } from '../../types/room';
 import { useHotel } from '../../context/HotelContext';
@@ -50,7 +51,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
     return () => clearInterval(interval);
   }, [room.status, activeBooking]);
 
-  // Calculate live estimate for Occupied room
+  // Live price calculation
   let liveDurationFormatted = '';
   let livePriceEstimate = 0;
 
@@ -80,13 +81,16 @@ export const RoomCard: React.FC<RoomCardProps> = ({
       case 'AVAILABLE': return 'Phòng Trống';
       case 'OCCUPIED': return 'Đang Có Khách';
       case 'DIRTY': return 'Chờ Dọn Buồng';
-      case 'MAINTENANCE': return 'Đang Sửa Chữa';
+      case 'MAINTENANCE': return 'Đang Bảo Trì';
       case 'RESERVED': return 'Đã Đặt Trước';
     }
   };
 
+  const defaultPlan = pricingPlans.find((p) => p.id === roomType?.defaultPricingPlanId) || pricingPlans[0];
+
   return (
     <div className={`room-card state-${room.status}`}>
+      {/* Top Header */}
       <div className="room-header">
         <div className="room-number-wrap">
           <span className="room-number">{room.roomNumber}</span>
@@ -98,17 +102,25 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         </span>
       </div>
 
+      {/* Room Type and Capacity */}
       <div className="room-type-title">
-        <span>{roomType?.name || 'Phòng Tiêu Chuẩn'}</span>
+        <Sparkles size={14} style={{ color: 'var(--gold-400)', flexShrink: 0 }} />
+        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          {roomType?.name || 'Phòng Tiêu Chuẩn'}
+        </span>
       </div>
 
       {/* Guest Live Box if Occupied */}
-      {room.status === 'OCCUPIED' && activeBooking && (
+      {room.status === 'OCCUPIED' && activeBooking ? (
         <div className="guest-live-box">
           <div className="guest-name-row">
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <UserIcon size={14} style={{ color: 'var(--text-muted)' }} />
-              {activeBooking.customerName}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+              <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(244, 63, 94, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
+                👤
+              </div>
+              <span style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                {activeBooking.customerName}
+              </span>
             </span>
             <span className="live-timer">
               <span className="pulse-dot" />
@@ -117,31 +129,53 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             </span>
           </div>
 
-          <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', marginBottom: 4 }}>
-            Hình thức: {activeBooking.bookingType === 'HOURLY' ? 'Theo giờ' : activeBooking.bookingType === 'OVERNIGHT' ? 'Qua đêm' : 'Theo ngày'}
-            {activeBooking.services.length > 0 && ` • ${activeBooking.services.length} dịch vụ`}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--text-muted)', marginBottom: 4 }}>
+            <span>
+              {activeBooking.bookingType === 'HOURLY' ? '⚡ Thuê theo giờ' : activeBooking.bookingType === 'OVERNIGHT' ? '🌙 Thuê qua đêm' : '📅 Thuê theo ngày'}
+            </span>
+            {activeBooking.services.length > 0 && (
+              <span style={{ color: '#38bdf8' }}>+{activeBooking.services.length} món minibar</span>
+            )}
           </div>
 
           <div className="live-price-est">
-            <span>Tạm tính hiện tại:</span>
+            <span>Tạm tính tiền phòng + DV:</span>
             <strong>{livePriceEstimate.toLocaleString('vi-VN')} đ</strong>
           </div>
         </div>
-      )}
-
-      {/* Dirty notes if dirty */}
-      {room.status === 'DIRTY' && (
-        <div style={{ background: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#d8b4fe' }}>
-          <strong>Lưu ý dọn:</strong> {room.cleanNotes || 'Cần thay chăn ga gối & lau sàn khử khuẩn'}
+      ) : room.status === 'AVAILABLE' ? (
+        /* Price Preview for Available Room */
+        <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-glass)', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Giá tham khảo ({defaultPlan?.hourlyRate.firstBlockHours}h đầu):</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: '#34d399', fontFamily: 'var(--font-mono)' }}>
+              {defaultPlan?.hourlyRate.firstBlockPrice.toLocaleString('vi-VN')} đ
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, fontSize: 11.5, color: 'var(--text-dim)' }}>
+            <span>Đêm: {defaultPlan?.overnightRate.flatPrice.toLocaleString('vi-VN')} đ</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Users size={12} /> Tối đa {roomType?.maxOccupancy || 2} khách
+            </span>
+          </div>
         </div>
-      )}
-
-      {/* Maintenance notes */}
-      {room.status === 'MAINTENANCE' && (
-        <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.25)', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#fde047' }}>
-          <strong>Sự cố:</strong> {room.maintenanceReason || 'Đang bảo trì thiết bị'}
+      ) : room.status === 'DIRTY' ? (
+        /* Dirty Note */
+        <div style={{ background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.3)', borderRadius: 10, padding: 12, marginBottom: 14, fontSize: 12.5, color: '#d8b4fe' }}>
+          <div style={{ fontWeight: 700, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>🧹</span> Cần Buồng Phòng Dọn Dẹp
+          </div>
+          <div style={{ color: 'var(--text-muted)' }}>{room.cleanNotes || 'Khách vừa checkout, cần khử khuẩn & thay ga gối'}</div>
         </div>
-      )}
+      ) : room.status === 'MAINTENANCE' ? (
+        /* Maintenance Note */
+        <div style={{ background: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: 10, padding: 12, marginBottom: 14, fontSize: 12.5, color: '#fde047' }}>
+          <div style={{ fontWeight: 700, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>⚠️</span> Đang Bảo Trì Trang Thiết Bị
+          </div>
+          <div style={{ color: 'var(--text-muted)' }}>{room.maintenanceReason || 'Bảo trì điều hòa / thiết bị vệ sinh'}</div>
+        </div>
+      ) : null}
 
       {/* Amenities Tags */}
       <div className="amenities-tag-bar">
@@ -153,7 +187,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         ))}
       </div>
 
-      {/* Card Footer Actions */}
+      {/* Card Action Footer */}
       <div className="room-card-footer">
         {room.status === 'AVAILABLE' && (
           <button
@@ -178,14 +212,14 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             </button>
             <button
               className="btn btn-secondary btn-sm"
-              title="Thêm đồ uống / dịch vụ minibar"
+              title="Gọi thêm minibar / nước ngọt / đồ ăn"
               onClick={() => onAddService(activeBooking.id)}
             >
               <Coffee size={15} />
             </button>
             <button
               className="btn btn-secondary btn-sm"
-              title="Chuyển khách sang phòng khác"
+              title="Chuyển sang phòng khác"
               onClick={() => onChangeRoom(activeBooking.id)}
             >
               <ArrowLeftRight size={15} />
@@ -222,7 +256,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             onClick={() => onCheckIn(room)}
           >
             <CheckCircle2 size={15} />
-            <span>Khách Đến Nhận Phòng</span>
+            <span>Nhận Phòng Đặt Trước</span>
           </button>
         )}
       </div>
